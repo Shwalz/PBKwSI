@@ -1,0 +1,1 @@
+R	270115144158Z	261007144158Z	01	unknown	/C=PL/ST=mazowieckie/O=UwS/OU=Instytut Informatyki/L=Siedlce/CN=Yahor Falkouski/emailAddress=student@example.com

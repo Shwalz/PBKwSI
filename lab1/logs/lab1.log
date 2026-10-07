@@ -1,0 +1,253 @@
+
+=== Zadanie 1a: wersja OpenSSL ===
+$ openssl version -a
+OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)
+built on: Tue Sep 29 13:57:30 2026 UTC
+platform: darwin64-arm64-cc
+options:  bn(64,64)
+compiler: clang -fPIC -arch arm64 -O3 -Wall -DL_ENDIAN -DOPENSSL_PIC -D_REENTRANT -DOPENSSL_BUILDING_OPENSSL -DNDEBUG
+OPENSSLDIR: "/opt/homebrew/etc/openssl@3"
+ENGINESDIR: "/opt/homebrew/Cellar/openssl@3/3.6.5/lib/engines-3"
+MODULESDIR: "/opt/homebrew/Cellar/openssl@3/3.6.5/lib/ossl-modules"
+Seeding source: os-specific
+CPUINFO: OPENSSL_armcap=0x987d
+
+=== Zadanie 1b: hasze MD5 i SHA-1 ===
+MD5(stdin)= 8095817dbc54ab3c7014102869a44ad3
+SHA1(stdin)= b7a9bf2cce0ad226b9faeb61e8c4f0e72e876c8f
+
+=== Zadanie 1c: klucz HEX 2048 bit i szyfrowanie AES-256-CBC ===
+dane.key: 512 znakow HEX
+$ openssl enc -aes-256-cbc -salt -pbkdf2 -in tekst.in -out tekst.out -pass file:dane.key
+00000000: 5361 6c74 6564 5f5f f535 44b7 203d cc5f  Salted__.5D. =._
+00000010: 4bd9 a56e 3b52 bc23 798f 333f ddfb 023e  K..n;R.#y.3?...>
+
+=== Zadanie 1d: deszyfrowanie ===
+$ openssl enc -aes-256-cbc -d -pbkdf2 -in tekst.out -out tekst.decrypt -pass file:dane.key
+Yahor Falkouski
+OK: tekst.decrypt identyczny z tekst.in
+
+=== Zadanie 2: konfiguracja openssl.cnf ===
+HOME = .
+
+[ ca ]
+default_ca = moje_ca
+
+[ moje_ca ]
+dir              = .
+certs            = $dir/certs
+crl_dir          = $dir/crl
+database         = $dir/index.txt
+new_certs_dir    = $dir/newcerts
+certificate      = $dir/cacert.pem
+serial           = $dir/serial
+crlnumber        = $dir/crlnumber
+crl              = $dir/crl.pem
+private_key      = $dir/private/cakey.pem
+x509_extensions  = usr_cert
+copy_extensions  = none
+default_days     = 100
+default_crl_days = 20
+default_md       = sha256
+preserve         = no
+unique_subject   = yes
+policy           = policy_match
+
+[ policy_match ]
+countryName            = match
+stateOrProvinceName    = match
+organizationName       = optional
+organizationalUnitName = optional
+localityName           = optional
+commonName             = supplied
+emailAddress           = supplied
+
+[ req ]
+default_bits       = 2048
+default_keyfile    = privkey.pem
+distinguished_name = req_distinguished_name
+attributes         = req_attributes
+x509_extensions    = v3_ca
+string_mask        = utf8only
+
+[ req_distinguished_name ]
+countryName = Kod kraju (podaj 2 litery)
+countryName_default = PL
+countryName_min = 2
+countryName_max = 2
+stateOrProvinceName = Nazwa wojewodztwa
+stateOrProvinceName_default = mazowieckie
+localityName = Lokalizacja (np. miasto)
+localityName_default = Siedlce
+0.organizationName = Nazwa organizacji
+0.organizationName_default = UwS
+organizationalUnitName = Nazwa jednostki
+organizationalUnitName_default = Instytut Informatyki
+commonName = Imie i nazwisko wlasciciela
+commonName_max = 64
+emailAddress = Adres skrzynki e-mail
+emailAddress_max = 64
+
+[ req_attributes ]
+challengePassword = Podaj haslo
+challengePassword_default = challenge6
+challengePassword_min = 6
+challengePassword_max = 20
+
+[ usr_cert ]
+basicConstraints = CA:FALSE
+nsComment        = "testowy certyfikat"
+
+[ v3_ca ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints       = critical,CA:TRUE
+
+=== Zadanie 3a: struktura katalogow i plikow ===
+certs
+crl
+crlnumber
+crt
+dane.key
+index.txt
+moje_dane.md5
+moje_dane.sha
+newcerts
+openssl.cnf
+passwords.txt
+private
+serial
+tekst.decrypt
+tekst.in
+tekst.out
+
+=== Zadanie 3b: klucz CA 4096 bit zaszyfrowany 3DES ===
+$ openssl genrsa -out private/cakey.pem 4096
+$ openssl rsa -in private/cakey.pem -out private/cakey.enc -outform PEM -des3 -passout env:CA_PASS
+writing RSA key
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+
+=== Zadanie 3c: autocertyfikat CA na dwa lata ===
+$ openssl req -new -x509 -batch -days 730 -passin env:CA_PASS -key private/cakey.pem -out cacert.pem -subj /C=PL/ST=mazowieckie/L=Siedlce/O=UwS/OU=Instytut Informatyki/CN=moje_ca/emailAddress=ca@example.com
+subject=C=PL, ST=mazowieckie, L=Siedlce, O=UwS, OU=Instytut Informatyki, CN=moje_ca, emailAddress=ca@example.com
+issuer=C=PL, ST=mazowieckie, L=Siedlce, O=UwS, OU=Instytut Informatyki, CN=moje_ca, emailAddress=ca@example.com
+notBefore=Oct  7 14:41:58 2026 GMT
+notAfter=Oct  6 14:41:58 2028 GMT
+
+=== Zadanie 4a: klucz uzytkownika i zgloszenie ===
+$ openssl genrsa -out newkey01.pem 2048
+Certificate request self-signature verify OK
+subject=C=PL, ST=mazowieckie, L=Siedlce, O=UwS, OU=Instytut Informatyki, CN=Yahor Falkouski, emailAddress=student@example.com
+
+=== Zadanie 4b: CA wystawia certyfikat ===
+serial: 01
+index.txt: []
+$ openssl ca -batch -in moje_req01.req -passin env:CA_PASS -notext -out user01.pem
+Using configuration from ./openssl.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+countryName           :PRINTABLE:'PL'
+stateOrProvinceName   :ASN.1 12:'mazowieckie'
+localityName          :ASN.1 12:'Siedlce'
+organizationName      :ASN.1 12:'UwS'
+organizationalUnitName:ASN.1 12:'Instytut Informatyki'
+commonName            :ASN.1 12:'Yahor Falkouski'
+emailAddress          :IA5STRING:'student@example.com'
+Certificate is to be certified until Jan 15 14:41:58 2027 GMT (100 days)
+
+Write out database with 1 new entries
+Database updated
+01.pem
+
+=== Zadanie 4c: zmiany w serial i index.txt ===
+serial: 02 (serial.old: 01)
+V	270115144158Z		01	unknown	/C=PL/ST=mazowieckie/O=UwS/OU=Instytut Informatyki/L=Siedlce/CN=Yahor Falkouski/emailAddress=student@example.com
+subject=C=PL, ST=mazowieckie, O=UwS, OU=Instytut Informatyki, L=Siedlce, CN=Yahor Falkouski, emailAddress=student@example.com
+issuer=C=PL, ST=mazowieckie, L=Siedlce, O=UwS, OU=Instytut Informatyki, CN=moje_ca, emailAddress=ca@example.com
+notBefore=Oct  7 14:41:58 2026 GMT
+notAfter=Jan 15 14:41:58 2027 GMT
+X509v3 Basic Constraints: 
+    CA:FALSE
+            Netscape Comment: 
+                testowy certyfikat
+
+=== Zadanie 4d: drugi certyfikat dla tego samego zgloszenia ===
+Using configuration from ./openssl.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+countryName           :PRINTABLE:'PL'
+stateOrProvinceName   :ASN.1 12:'mazowieckie'
+localityName          :ASN.1 12:'Siedlce'
+organizationName      :ASN.1 12:'UwS'
+organizationalUnitName:ASN.1 12:'Instytut Informatyki'
+commonName            :ASN.1 12:'Yahor Falkouski'
+emailAddress          :IA5STRING:'student@example.com'
+ERROR:There is already a certificate for /C=PL/ST=mazowieckie/O=UwS/OU=Instytut Informatyki/L=Siedlce/CN=Yahor Falkouski/emailAddress=student@example.com
+The matching entry has the following details
+Type          :Valid
+Expires on    :270115144158Z
+Serial Number :01
+File name     :unknown
+Subject Name  :/C=PL/ST=mazowieckie/O=UwS/OU=Instytut Informatyki/L=Siedlce/CN=Yahor Falkouski/emailAddress=student@example.com
+certyfikat NIE zostal utworzony
+
+=== Zadanie 5e: lista CRL przed uniewaznieniem ===
+$ openssl ca -gencrl -passin env:CA_PASS -out crl/lista_1.crl
+Using configuration from ./openssl.cnf
+Certificate Revocation List (CRL):
+    Version 2 (0x1)
+    Signature Algorithm: sha256WithRSAEncryption
+    Issuer: C=PL, ST=mazowieckie, L=Siedlce, O=UwS, OU=Instytut Informatyki, CN=moje_ca, emailAddress=ca@example.com
+    Last Update: Oct  7 14:41:58 2026 GMT
+    Next Update: Oct 27 14:41:58 2026 GMT
+    CRL extensions:
+        X509v3 CRL Number: 
+            1
+No Revoked Certificates.
+    Signature Algorithm: sha256WithRSAEncryption
+    Signature Value:
+
+=== Zadanie 5f: uniewaznienie certyfikatu ===
+$ openssl ca -revoke newcerts/01.pem -passin env:CA_PASS
+Using configuration from ./openssl.cnf
+Revoking Certificate 01.
+Database updated
+R	270115144158Z	261007144158Z	01	unknown	/C=PL/ST=mazowieckie/O=UwS/OU=Instytut Informatyki/L=Siedlce/CN=Yahor Falkouski/emailAddress=student@example.com
+
+=== Zadanie 5g: lista CRL z crldays i crlhours ===
+$ openssl ca -gencrl -crldays 7 -crlhours 12 -passin env:CA_PASS -out crl/lista_2.crl
+Using configuration from ./openssl.cnf
+Certificate Revocation List (CRL):
+    Version 2 (0x1)
+    Signature Algorithm: sha256WithRSAEncryption
+    Issuer: C=PL, ST=mazowieckie, L=Siedlce, O=UwS, OU=Instytut Informatyki, CN=moje_ca, emailAddress=ca@example.com
+    Last Update: Oct  7 14:41:58 2026 GMT
+    Next Update: Oct 15 02:41:58 2026 GMT
+    CRL extensions:
+        X509v3 CRL Number: 
+            2
+Revoked Certificates:
+    Serial Number: 01
+        Revocation Date: Oct  7 14:41:58 2026 GMT
+    Signature Algorithm: sha256WithRSAEncryption
+    Signature Value:
+        2b:b5:5c:77:ab:e8:a0:10:30:1c:27:99:58:95:a8:d3:c2:b0:
+        ab:9e:a9:86:2b:c7:4e:a3:53:72:5a:02:d4:f1:7f:e8:62:82:
+lastUpdate=Oct  7 14:41:58 2026 GMT
+nextUpdate=Oct 15 02:41:58 2026 GMT
+
+=== Zadanie 6a: PKCS #12 ===
+$ openssl pkcs12 -export -in newcerts/01.pem -inkey newkey01.pem -certfile cacert.pem -out 01.p12 -passout env:P12_PASS
+MAC: sha256, Iteration 2048
+MAC length: 32, salt length: 16
+PKCS7 Encrypted data: PBES2, PBKDF2, AES-256-CBC, Iteration 2048, PRF hmacWithSHA256
+Certificate bag
+Certificate bag
+
+=== Weryfikacja lancucha ===
+newcerts/01.pem: OK
+C=PL, ST=mazowieckie, O=UwS, OU=Instytut Informatyki, L=Siedlce, CN=Yahor Falkouski, emailAddress=student@example.com
+error 23 at 0 depth lookup: certificate revoked
+error newcerts/01.pem: verification failed

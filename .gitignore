@@ -1,0 +1,8 @@
+*.pdf
+.DS_Store
+lab*/work/private/
+lab*/work/passwords.txt
+lab*/work/*.p12
+lab*/work/*.key
+lab*/work/newkey*.pem
+lab*/work/*.old
