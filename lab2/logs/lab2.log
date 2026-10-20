@@ -1,0 +1,159 @@
+
+
+===== Zadanie 1. Instalacja serwera =====
+instalacja: kod 0
+
+$ hostname; date -u
+kerberos.uws.edu.pl
+Tue Oct 20 15:43:13 UTC 2026
+
+$ date -u
+Tue Oct 20 15:43:13 UTC 2026
+
+$ grep -c . /etc/hosts; getent hosts kerberos.uws.edu.pl
+7
+172.19.0.2      kerberos.uws.edu.pl kerberos
+
+
+===== Zadanie 2. Konfiguracja serwera i baza danych =====
+
+$ cat /etc/krb5.conf /etc/krb5kdc/kdc.conf /etc/krb5kdc/kadm5.acl
+[libdefaults]
+        default_realm = REALM.KB.UWS.EDU.PL
+        rdns = false
+        dns_canonicalize_hostname = false
+
+[realms]
+        REALM.KB.UWS.EDU.PL = {
+                kdc = kerberos.uws.edu.pl
+                admin_server = kerberos.uws.edu.pl
+        }
+
+[domain_realm]
+        kerberos.uws.edu.pl = REALM.KB.UWS.EDU.PL
+[kdcdefaults]
+    kdc_ports = 750,88
+
+[realms]
+    REALM.KB.UWS.EDU.PL = {
+        database_name = /var/lib/krb5kdc/principal
+        admin_keytab = FILE:/etc/krb5kdc/kadm5.keytab
+        acl_file = /etc/krb5kdc/kadm5.acl
+        key_stash_file = /etc/krb5kdc/stash
+        kdc_ports = 750,88
+        max_life = 10h 0m 0s
+        max_renewable_life = 7d 0h 0m 0s
+        master_key_type = aes256-cts
+        supported_enctypes = aes256-cts:normal aes128-cts:normal
+        default_principal_flags = +preauth
+    }
+*/admin@REALM.KB.UWS.EDU.PL *
+
+$ kdb5_util create -r REALM.KB.UWS.EDU.PL -s -P masterpass123 2>&1 | tail -5
+Initializing database '/var/lib/krb5kdc/principal' for realm 'REALM.KB.UWS.EDU.PL',
+master key name 'K/M@REALM.KB.UWS.EDU.PL'
+
+$ ls -l /var/lib/krb5kdc
+total 16
+-rw------- 1 root root 8192 Oct 20 15:43 principal
+-rw------- 1 root root 8192 Oct 20 15:43 principal.kadm5
+-rw------- 1 root root    0 Oct 20 15:43 principal.kadm5.lock
+-rw------- 1 root root    0 Oct 20  2026 principal.ok
+
+
+===== Uruchomienie serwera Kerberos =====
+Starting Kerberos KDC: krb5kdc.
+Starting Kerberos administrative servers: kadmind.
+
+$ service krb5-kdc status; service krb5-admin-server status
+krb5kdc is running.
+kadmind is running.
+
+
+===== Zadanie 3. Zarządzanie użytkownikami =====
+No policy specified for student/admin@REALM.KB.UWS.EDU.PL; defaulting to no policy
+Principal "student/admin@REALM.KB.UWS.EDU.PL" created.
+No policy specified for student@REALM.KB.UWS.EDU.PL; defaulting to no policy
+Principal "student@REALM.KB.UWS.EDU.PL" created.
+No policy specified for host/kerberos.uws.edu.pl@REALM.KB.UWS.EDU.PL; defaulting to no policy
+Principal "host/kerberos.uws.edu.pl@REALM.KB.UWS.EDU.PL" created.
+Entry for principal host/kerberos.uws.edu.pl with kvno 2, encryption type aes256-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.
+Entry for principal host/kerberos.uws.edu.pl with kvno 2, encryption type aes128-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.
+
+$ kadmin.local -q listprincs
+Authenticating as principal root/admin@REALM.KB.UWS.EDU.PL with password.
+K/M@REALM.KB.UWS.EDU.PL
+host/kerberos.uws.edu.pl@REALM.KB.UWS.EDU.PL
+kadmin/admin@REALM.KB.UWS.EDU.PL
+kadmin/changepw@REALM.KB.UWS.EDU.PL
+krbtgt/REALM.KB.UWS.EDU.PL@REALM.KB.UWS.EDU.PL
+student/admin@REALM.KB.UWS.EDU.PL
+student@REALM.KB.UWS.EDU.PL
+
+$ klist -k /etc/krb5.keytab
+Keytab name: FILE:/etc/krb5.keytab
+KVNO Principal
+---- --------------------------------------------------------------------------
+   2 host/kerberos.uws.edu.pl@REALM.KB.UWS.EDU.PL
+   2 host/kerberos.uws.edu.pl@REALM.KB.UWS.EDU.PL
+
+
+===== Zadanie 4. Konfiguracja serwera SSH =====
+Starting OpenBSD Secure Shell server: sshd.
+
+$ grep -E '^GSSAPI' /etc/ssh/sshd_config; service ssh status; id student
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials yes
+sshd is running.
+uid=1000(student) gid=1000(student) groups=1000(student)
+
+
+===== Zadanie 5. Klient: uwierzytelnianie przez Kerberos =====
+instalacja: kod 0
+
+$ tail -4 /etc/ssh/ssh_config
+    GSSAPIAuthentication yes
+Host *
+    GSSAPIAuthentication yes
+    GSSAPIKeyExchange yes
+
+$ echo studentpass1 | kinit student
+Password for student@REALM.KB.UWS.EDU.PL: 
+
+$ klist
+Ticket cache: FILE:/tmp/krb5cc_0
+Default principal: student@REALM.KB.UWS.EDU.PL
+
+Valid starting     Expires            Service principal
+10/20/26 15:43:20  10/21/26 01:43:20  krbtgt/REALM.KB.UWS.EDU.PL@REALM.KB.UWS.EDU.PL
+	renew until 10/21/26 15:43:20
+
+$ ssh -v -o StrictHostKeyChecking=accept-new -o PasswordAuthentication=no -o PubkeyAuthentication=no student@kerberos.uws.edu.pl 'whoami; hostname; klist 2>&1 | head -5' 2>&1 | grep -E 'GSSAPI|gss|Authenticat|Authenticated|student|kerberos|Bad option|Unsupported'
+debug1: Connecting to kerberos.uws.edu.pl [172.19.0.2] port 22.
+debug1: Authenticating to kerberos.uws.edu.pl:22 as 'student'
+debug1: Offering GSSAPI proposal: gss-group14-sha256-toWM5Slw5Ew8Mqkay+al2g==,gss-group16-sha512-toWM5Slw5Ew8Mqkay+al2g==,gss-nistp256-sha256-toWM5Slw5Ew8Mqkay+al2g==,gss-curve25519-sha256-toWM5Slw5Ew8Mqkay+al2g==,gss-group14-sha1-toWM5Slw5Ew8Mqkay+al2g==,gss-gex-sha1-toWM5Slw5Ew8Mqkay+al2g==,gss-group14-sha256-eipGX3TCiQSrx573bT1o1Q==,gss-group16-sha512-eipGX3TCiQSrx573bT1o1Q==,gss-nistp256-sha256-eipGX3TCiQSrx573bT1o1Q==,gss-curve25519-sha256-eipGX3TCiQSrx573bT1o1Q==,gss-group14-sha1-eipGX3TCiQSrx573bT1o1Q==,gss-gex-sha1-eipGX3TCiQSrx573bT1o1Q==
+Warning: Permanently added 'kerberos.uws.edu.pl' (ED25519) to the list of known hosts.
+debug1: Authentications that can continue: publickey,gssapi-keyex,gssapi-with-mic,password
+debug1: Next authentication method: gssapi-keyex
+debug1: Next authentication method: gssapi-with-mic
+Authenticated to kerberos.uws.edu.pl ([172.19.0.2]:22) using "gssapi-with-mic".
+student
+kerberos.uws.edu.pl
+
+$ klist
+Ticket cache: FILE:/tmp/krb5cc_0
+Default principal: student@REALM.KB.UWS.EDU.PL
+
+Valid starting     Expires            Service principal
+10/20/26 15:43:20  10/21/26 01:43:20  krbtgt/REALM.KB.UWS.EDU.PL@REALM.KB.UWS.EDU.PL
+	renew until 10/21/26 15:43:20
+10/20/26 15:43:20  10/21/26 01:43:20  host/kerberos.uws.edu.pl@REALM.KB.UWS.EDU.PL
+	renew until 10/21/26 15:43:20
+
+$ grep -iE 'gssapi|accepted' /var/log/auth.log 2>/dev/null | tail -5; true
+
+
+===== Kontrola negatywna: bez biletu logowanie bez hasła nie działa =====
+
+$ kdestroy; ssh -o StrictHostKeyChecking=accept-new -o PasswordAuthentication=no -o PubkeyAuthentication=no -o BatchMode=yes student@kerberos.uws.edu.pl whoami 2>&1 | tail -2
+student@kerberos.uws.edu.pl: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password).
